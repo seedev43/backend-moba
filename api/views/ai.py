@@ -68,17 +68,17 @@ def add_rating(request):
             data = json.loads(request.body)
 
             user_id = data.get("user_id")
-            id_movie = data.get("movie_id")
+            movie_id = data.get("movie_id")
             rating = data.get("rating") 
             genre = data.get("genre")  
 
             print(data)
 
             # Validasi input
-            # if user_id or id_movie or rating or genre is None:
+            # if user_id or movie_id or rating or genre is None:
             #     return JsonResponse({
             #         "success": False,
-            #         "message": "user_id, id_movie, rating, and genre are required."
+            #         "message": "user_id, movie_id, rating, and genre are required."
             #     }, status=400)
 
             try:
@@ -92,7 +92,7 @@ def add_rating(request):
             # Simpan rating ke database
             user_rating, created = UserRating.objects.update_or_create(
                 user=user,
-                id_movie=id_movie,
+                movie_id=movie_id,
                 defaults={
                     'rating': rating,
                     'genre':genre
@@ -106,7 +106,7 @@ def add_rating(request):
                     "data": {
                         "id": user_rating.id,
                         "user": user_rating.user.username,
-                        "id_movie": user_rating.id_movie,
+                        "movie_id": user_rating.movie_id,
                         "rating": user_rating.rating,
                         "genre": user_rating.genre,
                         "created_at": user_rating.created_at
@@ -119,7 +119,7 @@ def add_rating(request):
                     "data": {
                         "id": user_rating.id,
                         "user": user_rating.user.username,
-                        "id_movie": user_rating.id_movie,
+                        "movie_id": user_rating.movie_id,
                         "rating": user_rating.rating,
                         "genre": user_rating.genre,
                         "updated_at": user_rating.updated_at
@@ -138,10 +138,8 @@ def get_recommendation_movies(request):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            user_id = data.get("user_id")  # ID pengguna
-            movie_id = data.get("movie_id")  # ID film yang ingin diperiksa
+            user_id = data.get("user_id")
 
-            # Dapatkan objek User berdasarkan user_id
             try:
                 user = User.objects.get(id=user_id)
             except User.DoesNotExist:
@@ -152,22 +150,55 @@ def get_recommendation_movies(request):
 
             # Cek apakah pengguna sudah memberikan rating untuk film tertentu
             try:
-                user_rating = UserRating.objects.get(user=user, id_movie=movie_id)
+                user_rating = UserRating.objects.filter(user=user).latest('created_at')
+
+                # Ambil genre dari rating terakhir pengguna
+                genre = user_rating.genre.lower()
+
+                # Cari indeks berdasarkan genre
+                matching_movies = movie_list_loaded[movie_list_loaded['genres'] == genre]
+                if matching_movies.empty:
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'No movies found for the given genre: {genre}.',
+                        'data': []
+                    }, status=404)
+
+                idx = matching_movies.index[0]  # Ambil indeks pertama dari hasil pencarian
+                
+                # Hitung skor kemiripan
+                sim_scores = list(enumerate(cosine_sim_loaded[idx]))
+                sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+                sim_scores = sim_scores[1:30]  # Ambil 30 film teratas
+                movie_indices = [i[0] for i in sim_scores]
+                
+                # Ambil data film rekomendasi
+                recommended_movies = movie_list_loaded.iloc[movie_indices][['id', 'title', 'poster_path', 'genres']]
+                recommended_movies_list = recommended_movies.to_dict(orient='records')
+
                 return JsonResponse({
                     "success": True,
-                    "message": "User has already rated this movie.",
-                    "rating": user_rating.rating  # Rating yang sudah diberikan
+                    "message": "Recommendations fetched successfully.",
+                    "data": recommended_movies_list
                 }, status=200)
 
             except UserRating.DoesNotExist:
                 return JsonResponse({
                     "success": False,
-                    "message": "User has not rated this movie yet."
+                    "message": "User has not rated any movies yet.",
+                    "data": []
                 }, status=404)
 
         except json.JSONDecodeError:
             return JsonResponse({"success": False, "message": "Invalid JSON."}, status=400)
         except Exception as e:
-            return JsonResponse({"success": False, "message": str(e)}, status=500)
+            import traceback
+            error_details = traceback.format_exc()
+            print(error_details)
+            return JsonResponse({
+                "success": False,
+                "message": str(e),
+                "details": error_details
+            }, status=500)
 
     return JsonResponse({"success": False, "message": "Method not allowed."}, status=405)

@@ -25,5 +25,5 @@ urlpatterns = [
     path('user/<int:user_id>/', user_detail_view, name='user_detail'),
     path('similarity', similarity),
     path('add_rating', add_rating, name='add_rating'),
-    path('tes', get_recommendation_movies)
+    path('get-recommendation-movies', get_recommendation_movies)
 ]
