@@ -16,12 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from api.views import user_detail_view, similarity, add_rating
+from api.views.auth import user_detail_view
+from api.views.ai import similarity, add_rating, get_recommendation_movies
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('api.urls')),
     path('user/<int:user_id>/', user_detail_view, name='user_detail'),
     path('similarity', similarity),
-    path('add_rating', add_rating, name='add_rating')
+    path('add_rating', add_rating, name='add_rating'),
+    path('tes', get_recommendation_movies)
 ]
