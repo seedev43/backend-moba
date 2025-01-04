@@ -144,16 +144,18 @@ def add_rating(request):
             data = json.loads(request.body)
 
             user_id = data.get("user_id")
-            id_movie = data.get("id_movie")
+            id_movie = data.get("movie_id")
             rating = data.get("rating") 
             genre = data.get("genre")  
 
+            print(data)
+
             # Validasi input
-            if not user_id or not id_movie or rating or genre is None:
-                return JsonResponse({
-                    "success": False,
-                    "message": "user_id, id_movie, rating, and genre are required."
-                }, status=400)
+            # if user_id or id_movie or rating or genre is None:
+            #     return JsonResponse({
+            #         "success": False,
+            #         "message": "user_id, id_movie, rating, and genre are required."
+            #     }, status=400)
 
             try:
                 user = User.objects.get(id=user_id)
@@ -164,24 +166,41 @@ def add_rating(request):
                 }, status=404)
 
             # Simpan rating ke database
-            user_rating = UserRating.objects.create(
+            user_rating, created = UserRating.objects.update_or_create(
                 user=user,
                 id_movie=id_movie,
-                rating=rating,
-                genre=genre
-            )
-            return JsonResponse({
-                "success": True,
-                "message": "Rating added successfully.",
-                "data": {
-                    "id": user_rating.id,
-                    "user": user_rating.user.username,
-                    "id_movie": user_rating.id_movie,
-                    "rating": user_rating.rating,
-                    "genre": user_rating.genre,
-                    "created_at": user_rating.created_at
+                defaults={
+                    'rating': rating,
+                    'genre':genre
                 }
-            }, status=201)
+            )
+            
+            if created:
+                return JsonResponse({
+                    "success": True,
+                    "message": "Rating added successfully.",
+                    "data": {
+                        "id": user_rating.id,
+                        "user": user_rating.user.username,
+                        "id_movie": user_rating.id_movie,
+                        "rating": user_rating.rating,
+                        "genre": user_rating.genre,
+                        "created_at": user_rating.created_at
+                    }
+                }, status=201)
+            else:
+                return JsonResponse({
+                    "success": True,
+                    "message": "Rating updated successfully.",
+                    "data": {
+                        "id": user_rating.id,
+                        "user": user_rating.user.username,
+                        "id_movie": user_rating.id_movie,
+                        "rating": user_rating.rating,
+                        "genre": user_rating.genre,
+                        "updated_at": user_rating.updated_at
+                    }
+                }, status=200)
         
         except json.JSONDecodeError:
             return JsonResponse({"success": False, "message": "Invalid JSON."}, status=400)
